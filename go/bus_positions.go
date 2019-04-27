@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const timeFormat = "2019-04-27T13:22:00" // these are local
+
 // This should be the output from https://developer.wmata.com/docs/services/54763629281d83086473f231/operations/5476362a281d830c946a3d68
 type BusPositionList struct {
 	BusPositions []BusPositionReport
@@ -103,6 +105,15 @@ func logPosition(db *gorm.DB, bpr BusPositionReport, reportTime time.Time) {
 	err = db.Model(&trip).Association("BusPositions").Append(bp).Error
 	check(err)
 }
+
+func isBadTripData(trip TripInstance, location time.Location) (bool, error) {
+  startTime, err := time.ParseInLocation(timeFormat, trip.TripStartTime, &location)
+  if (err != nil) { return false, err }
+  endTime, err := time.ParseInLocation(timeFormat, trip.TripEndTime, &location)
+  if (err != nil) { return false, err }
+  return endTime.Before(startTime), nil
+}
+
 func main() {
 	filename := os.Args[1]
 	b, err := ioutil.ReadFile(filename)
