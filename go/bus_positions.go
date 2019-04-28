@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const timeFormat = "2019-04-27T13:22:00" // these are local
+const timeFormat = "2006-01-02T15:04:05" // these are local
 
 // This should be the output from https://developer.wmata.com/docs/services/54763629281d83086473f231/operations/5476362a281d830c946a3d68
 type BusPositionList struct {
@@ -79,10 +79,8 @@ func fileTime(filePath string) time.Time {
 
 }
 
-func logPosition(db *gorm.DB, bpr BusPositionReport, reportTime time.Time) {
-	var trip TripInstance
-	var err error
-	trip = TripInstance{
+func tripFromReport(bpr BusPositionReport) TripInstance {
+	return TripInstance{
 		VehicleID:     bpr.VehicleID,
 		TripID:        bpr.TripID,
 		RouteID:       bpr.RouteID,
@@ -93,6 +91,11 @@ func logPosition(db *gorm.DB, bpr BusPositionReport, reportTime time.Time) {
 		TripEndTime:   bpr.TripEndTime,
 		BlockNumber:   bpr.BlockNumber,
 	}
+}
+
+func logPosition(db *gorm.DB, bpr BusPositionReport, reportTime time.Time) {
+	var err error
+	trip := tripFromReport(bpr)
 	err = db.Where(TripInstance{TripID: trip.TripID, TripStartTime: trip.TripStartTime}).FirstOrCreate(&trip).Error
 	check(err)
 	bp := BusPosition{
@@ -106,16 +109,19 @@ func logPosition(db *gorm.DB, bpr BusPositionReport, reportTime time.Time) {
 	check(err)
 }
 
-func isBadTripData(trip TripInstance, location time.Location) (bool, error) {
-  startTime, err := time.ParseInLocation(timeFormat, trip.TripStartTime, &location)
-  if (err != nil) { return false, err }
-  endTime, err := time.ParseInLocation(timeFormat, trip.TripEndTime, &location)
-  if (err != nil) { return false, err }
-  return endTime.Before(startTime), nil
+func isBadTripData(trip TripInstance, location *time.Location) (bool, error) {
+	startTime, err := time.ParseInLocation(timeFormat, trip.TripStartTime, location)
+	if err != nil {
+		return false, err
+	}
+	endTime, err := time.ParseInLocation(timeFormat, trip.TripEndTime, location)
+	if err != nil {
+		return false, err
+	}
+	return endTime.Before(startTime), nil
 }
 
-func main() {
-	filename := os.Args[1]
+func parseFile(filename string) BusPositionList {
 	b, err := ioutil.ReadFile(filename)
 	check(err)
 
@@ -123,6 +129,12 @@ func main() {
 	err = json.Unmarshal(b, &m)
 	check(err)
 	fmt.Printf("The file contains %d bus positions.\n", len(m.BusPositions))
+	return m
+}
+
+func main() {
+	filename := os.Args[1]
+	m := parseFile(filename)
 	reportTime := fileTime(filename)
 
 	// TODO: This file name should be a flag.
