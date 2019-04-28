@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"io/ioutil"
-	"os"
 	"regexp"
 	"time"
 )
@@ -160,6 +160,7 @@ func fixBadTripData(bpr BusPositionReport, location *time.Location) BusPositionR
 }
 
 func parseFile(filename string) BusPositionList {
+	fmt.Printf("I will attempt to parse %s", filename)
 	b, err := ioutil.ReadFile(filename)
 	check(err)
 
@@ -171,9 +172,15 @@ func parseFile(filename string) BusPositionList {
 }
 
 func main() {
-	filename := os.Args[1]
-	m := parseFile(filename)
-	reportTime := fileTime(filename)
+	filename := flag.String("input_file", "", "JSON file with bus data")
+	onlyBadTripData := flag.Bool("bad_overnight_data_only", false, "ONLY process data with the overnight corruption bug")
+	flag.Parse()
+
+	m := parseFile(*filename)
+	reportTime := fileTime(*filename)
+
+	location, err := time.LoadLocation("US/Eastern")
+	check(err)
 
 	// TODO: This file name should be a flag.
 	dbConfig, err := ioutil.ReadFile("./database_config.txt")
@@ -190,6 +197,17 @@ func main() {
 	db.AutoMigrate(&TripInstance{}, &BusPosition{})
 
 	for _, bp := range m.BusPositions {
-		logPosition(db, bp, reportTime)
+		isBad, err := isBadTripData(bp, location)
+		check(err)
+		if isBad {
+			logPosition(db, fixBadTripData(bp, location), reportTime)
+		} else {
+			if !(*onlyBadTripData) {
+				logPosition(db, bp, reportTime)
+			} else {
+				fmt.Println("Skipping since we are only backfilling bad trip data.")
+			}
+
+		}
 	}
 }
