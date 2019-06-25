@@ -1,0 +1,15 @@
+#!/bin/sh
+
+DATA_PATH=$1
+SHORT_TERM_PATH=${DATA_PATH}/short_term
+TODAY=$(date +%Y%m%d)
+YESTERDAY=$(date +%Y-%m-%d -d "-1 days")
+YESTERDAY_ARCHIVE=${DATA_PATH}/archive/${YESTERDAY}.tar.gz
+
+if [ -f $YESTERDAY_ARCHIVE ]; then
+  exit $YESTERDAY_ARCHIVE already exists. Failure.
+fi
+
+cd ${SHORT_TERM_PATH}
+tar -zcvf ${YESTERDAY_ARCHIVE} ./${YESTERDAY}
+

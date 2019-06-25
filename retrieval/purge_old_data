@@ -1,0 +1,5 @@
+#!/bin/sh
+
+DATA_PATH=$1
+SHORT_TERM_PATH=${DATA_PATH}/short_term
+find ${SHORT_TERM_PATH} -mtime +10 -exec rm -rf {} \;
