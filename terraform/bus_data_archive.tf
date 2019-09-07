@@ -67,3 +67,18 @@ resource "aws_db_instance" "busdata00" {
 
   username = "busdata_user"
 }
+
+resource "aws_glacier_vault" "bus-data-vault-00" {
+  name = "bus-data-vault-00"
+}
+
+provider "aws" {
+  alias  = "eu-west-1"
+  region = "eu-west-1"
+}
+
+resource "aws_glacier_vault" "bus-data-vault-00-eu-west-1" {
+  provider = "aws.eu-west-1"
+
+  name = "bus-data-vault-00-eu-west-1"
+}
