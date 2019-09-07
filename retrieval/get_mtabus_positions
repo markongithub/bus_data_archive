@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ -z "$API_KEY" ] || [ -z "$DATA_ROOT" ]; then
+  echo "API_KEY or DATA_ROOT not set"
+  exit 1
+fi
+
+if [ -z "$SLEEP_TIME" ]; then
+  SLEEP_TIME=$[ ( $RANDOM % 15 ) + 15]
+fi
+sleep ${SLEEP_TIME}
+
+LOGFILE=/tmp/last_run_get_mtabus_positions
+
+UTC_DAY=$(date +%Y-%m-%d)
+OUTDIR=${DATA_ROOT}/mtabus/short_term/${UTC_DAY}
+mkdir -p ${OUTDIR}
+TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S)
+OUTFILE=${OUTDIR}/buses${TIMESTAMP}.json
+wget --no-check-certificate -O ${OUTFILE} "https://bustime.mta.info/api/siri/vehicle-monitoring.json?key="${API_KEY}
+touch ${LOGFILE}
