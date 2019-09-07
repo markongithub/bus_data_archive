@@ -4,12 +4,12 @@ SCRIPT_PATH=$(dirname "$0")
 API_KEY=$(cat ${SCRIPT_PATH}/wmata_api_key.txt)
 LOGFILE=/tmp/last_run_get_bus_positions
 UTC_DAY=$(date +%Y-%m-%d)
-OUTDIR=$HOME/coldstore/wmatabus/short_term/$UTC_DAY/
+OUTDIR=$HOME/coldstore/organized_transit_data/wmatabus/short_term/$UTC_DAY/
 mkdir -p $OUTDIR
 TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S)
 OUTFILE=$OUTDIR/buses$TIMESTAMP.json
 wget --no-check-certificate -O $OUTFILE "https://api.wmata.com/Bus.svc/json/jBusPositions?api_key=${API_KEY}"
 cd $HOME/git/bus_data_archive/go/prod
 
-./bus_positions -input_file $OUTFILE >> $OUTDIR/bus_positions.log 2>&1
+./bus_positions -input_file ${OUTFILE} >> ${OUTDIR}/bus_positions.log 2>&1
 touch $LOGFILE
