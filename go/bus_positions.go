@@ -109,18 +109,6 @@ func logPosition(db *gorm.DB, bpr BusPositionReport, reportTime time.Time) {
 	check(err)
 }
 
-func isBadTripData(bpr BusPositionReport, location *time.Location) (bool, error) {
-	startTime, err := time.ParseInLocation(timeFormat, bpr.TripStartTime, location)
-	if err != nil {
-		return false, err
-	}
-	endTime, err := time.ParseInLocation(timeFormat, bpr.TripEndTime, location)
-	if err != nil {
-		return false, err
-	}
-	return endTime.Before(startTime), nil
-}
-
 func subtractDayFromStartTime(bpr BusPositionReport, startTime time.Time) BusPositionReport {
 	output := bpr // we don't need a deep copy because bpr has no pointers
 	output.TripStartTime = startTime.AddDate(0, 0, -1).Format(timeFormat)
@@ -140,30 +128,32 @@ func addDayToBothTimes(bpr BusPositionReport, startTime time.Time, endTime time.
 	return output
 }
 
-func fixBadTripData(bpr BusPositionReport, location *time.Location) BusPositionReport {
+func fixBadTripData(bpr BusPositionReport, location *time.Location) (BusPositionReport, bool) {
 	// The trick here is figuring out if the start time is bad or the end time is
-	// bad. Typically before midnight they corrupt the start time and after
-	// midnight they corrupt the end time, but right around midnight we have to
-	// be careful. A bad end time will be about 23 hours in the past, so let's
+	// bad, or both. If the start and end time are on either side of midnight,
+	// they will corrupt the one that isn't "today". If the start and end time are
+	// on the same day, they'll BOTH be corrupted to be "today".
+	// A bad end time will be about 23 hours in the past, so let's
 	// try to detect that first.
 	reportTime, err := time.ParseInLocation(timeFormat, bpr.DateTime, location)
 	check(err)
-	endTime, err := time.ParseInLocation(timeFormat, bpr.TripEndTime, location)
-	check(err)
-	// If the end time is more than 12 hours ago it's corrupt.
-	if reportTime.Sub(endTime).Hours() > 12 {
-		fmt.Printf("I think the end time is bad. end time: %s, reportTime: %s\n", endTime, reportTime)
-		return addDayToEndTime(bpr, endTime)
-	}
 	startTime, err := time.ParseInLocation(timeFormat, bpr.TripStartTime, location)
 	check(err)
-	// A bad start time will typically be far into the future.
-	if startTime.Sub(reportTime).Hours() > 12 {
-		fmt.Printf("I think the start time is bad. start time: %s, reportTime: %s\n", startTime, reportTime)
-		return subtractDayFromStartTime(bpr, startTime)
+	endTime, err := time.ParseInLocation(timeFormat, bpr.TripEndTime, location)
+	check(err)
+	if endTime.Before(startTime) {
+		// Only one of them has been corrupted.
+		fmt.Printf("Bad data at %s: start time %s is after end time %s\n", reportTime, startTime, endTime)
+		// If the end time is more than 12 hours ago it's corrupt.
+		if reportTime.Sub(endTime).Hours() > 12 {
+			return addDayToEndTime(bpr, endTime), true
+		}
+		// A bad start time will typically be far into the future.
+		if startTime.Sub(reportTime).Hours() > 12 {
+			return subtractDayFromStartTime(bpr, startTime), true
+		}
 	}
-	panic(fmt.Errorf("I failed at fixing trip data. reportTime: %s, startTime: %s, endTime: %s", reportTime, startTime, endTime))
-	return BusPositionReport{}
+	return BusPositionReport{}, false
 }
 
 func parseFile(filename string) BusPositionList {
@@ -204,10 +194,9 @@ func main() {
 	db.AutoMigrate(&TripInstance{}, &BusPosition{})
 
 	for _, bp := range m.BusPositions {
-		isBad, err := isBadTripData(bp, location)
-		check(err)
+		fixed, isBad := fixBadTripData(bp, location)
 		if isBad {
-			logPosition(db, fixBadTripData(bp, location), reportTime)
+			logPosition(db, fixed, reportTime)
 		} else {
 			if !(*onlyBadTripData) {
 				logPosition(db, bp, reportTime)
