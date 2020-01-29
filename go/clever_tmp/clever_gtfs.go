@@ -4,12 +4,6 @@ import "github.com/artonge/go-gtfs"
 import "fmt"
 import "time"
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 func dateInRange(calendar gtfs.Calendar, dateYYYYMMDD string) bool {
 	return (calendar.Start <= dateYYYYMMDD &&
 		calendar.End >= dateYYYYMMDD)
@@ -130,7 +124,7 @@ func guessTrip(feed ReducedFeed, headsign string, firstSeen time.Time, lastSeen 
 
 }
 
-func main() {
+func mainOrNotIGuess() {
 	feed := loadReducedFeed("/home/mark/coldstore/gtfs/centro20190826")
 	fmt.Printf("%s", serviceIDsByDate(feed, "20190901"))
 }
