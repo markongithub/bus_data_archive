@@ -121,10 +121,10 @@ func addDayToEndTime(bpr BusPositionReport, endTime time.Time) BusPositionReport
 	return output
 }
 
-func addDayToBothTimes(bpr BusPositionReport, startTime time.Time, endTime time.Time) BusPositionReport {
+func addDayToBothTimes(bpr BusPositionReport, startTime time.Time, endTime time.Time, days int) BusPositionReport {
 	output := bpr // we don't need a deep copy because bpr has no pointers
-	output.TripStartTime = endTime.AddDate(0, 0, 1).Format(timeFormat)
-	output.TripEndTime = endTime.AddDate(0, 0, 1).Format(timeFormat)
+	output.TripStartTime = endTime.AddDate(0, 0, days).Format(timeFormat)
+	output.TripEndTime = endTime.AddDate(0, 0, days).Format(timeFormat)
 	return output
 }
 
@@ -152,6 +152,9 @@ func fixBadTripData(bpr BusPositionReport, location *time.Location) (BusPosition
 		if startTime.Sub(reportTime).Hours() > 12 {
 			return subtractDayFromStartTime(bpr, startTime), true
 		}
+	}
+	if startTime.Sub(reportTime).Hours() > 16 {
+
 	}
 	return BusPositionReport{}, false
 }
