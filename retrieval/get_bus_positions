@@ -9,7 +9,5 @@ mkdir -p $OUTDIR
 TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S)
 OUTFILE=$OUTDIR/buses$TIMESTAMP.json
 wget --no-check-certificate -O $OUTFILE "https://api.wmata.com/Bus.svc/json/jBusPositions?api_key=${API_KEY}"
-cd $HOME/git/bus_data_archive/go/prod
 
-./bus_positions -input_file ${OUTFILE} >> ${OUTDIR}/bus_positions.log 2>&1
 touch $LOGFILE
