@@ -119,10 +119,9 @@ func findExistingTrip(db *gorm.DB, cache TripCache, bpr CleverPositionReport, re
 	return newTrip, false
 }
 
-func logPosition(db *gorm.DB, bpr CleverPositionReport, reportTime time.Time) {
+func logPosition(db *gorm.DB, cache TripCache, bpr CleverPositionReport, reportTime time.Time) {
 	var err error
-	emptyCache := make(TripCache)
-	trip, tripFound := findExistingTrip(db, emptyCache, bpr, reportTime)
+	trip, tripFound := findExistingTrip(db, cache, bpr, reportTime)
 	if !tripFound {
 		fmt.Printf("We are seeing this trip for the first time.")
 		db.NewRecord(trip)
@@ -194,12 +193,14 @@ func main() {
 
 	db.AutoMigrate(&TripInstance{}, &BusPosition{})
 
+	emptyCache := make(TripCache)
+
 	for _, bp := range m.BusPositions {
 		fmt.Printf("bus %s has head sign %s\n", bp.Vehicle, bp.HeadSign)
 		if (bp.HeadSign == "Not in Service") || bp.HeadSign == "N/A" {
 			fmt.Printf("We will skip that one.\n")
 		} else {
-			logPosition(db, bp, reportTime)
+			logPosition(db, emptyCache, bp, reportTime)
 		}
 	}
 }
