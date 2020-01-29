@@ -62,6 +62,8 @@ type BusPosition struct {
 	RetrievedAt    time.Time
 }
 
+type TripCache map[string]TripInstance
+
 func check(e error) {
 	if e != nil {
 		panic(e)
@@ -82,33 +84,45 @@ func fileTime(filePath string) time.Time {
 
 }
 
-func findExistingTrip(db *gorm.DB, bpr CleverPositionReport, reportTime time.Time) (TripInstance, bool) {
+func matchTrips(t1 TripInstance, t2 TripInstance) bool {
+	if (t1.DirectionDD == t2.DirectionDD) &&
+		(t1.PathID == t2.PathID) &&
+		(t1.Run == t2.Run) &&
+		(t1.HeadSign == t2.HeadSign) &&
+		(t1.Route == t2.Route) &&
+		// this last one is crude. for a long ride, this means a 30 minute gap is
+		// going to confuse us and make us think it's a new trip. GTFS would help
+		// a lot. We could see if we expected the trip to still be going.
+		// also this only works if you are adding reports in chronological order.
+		(t2.LastSeen.Sub(t1.LastSeen).Minutes() < 30) {
+		fmt.Printf("Matched with old trip last seen at %s with head sign %s", t1.LastSeen, t1.HeadSign)
+		return true
+	}
+	return false
+}
+
+func findExistingTrip(db *gorm.DB, cache TripCache, bpr CleverPositionReport, reportTime time.Time) (TripInstance, bool) {
 	newTrip := tripFromReport(bpr, reportTime)
+	cachedTrip, cacheHit := cache[bpr.Vehicle]
+	if cacheHit && matchTrips(cachedTrip, newTrip) {
+		return cachedTrip, true
+	}
 	oldTrip := TripInstance{}
 	if (db.Where(TripInstance{Vehicle: bpr.Vehicle}).Order("last_seen desc").First(&oldTrip).RecordNotFound()) {
 		return newTrip, false
 	}
 	// So we found the most recently seen trip by the same vehicle. Now we try to
 	// figure out if this bus is on the same trip.
-	if (oldTrip.DirectionDD == newTrip.DirectionDD) &&
-		(oldTrip.PathID == newTrip.PathID) &&
-		(oldTrip.Run == newTrip.Run) &&
-		(oldTrip.HeadSign == newTrip.HeadSign) &&
-		(oldTrip.Route == newTrip.Route) &&
-		// this last one is crude. for a long ride, this means a 30 minute gap is
-		// going to confuse us and make us think it's a new trip. GTFS would help
-		// a lot. We could see if we expected the trip to still be going.
-		(newTrip.LastSeen.Sub(oldTrip.LastSeen).Minutes() < 30) {
-		fmt.Printf("Matched with old trip last seen at %s with head sign %s", oldTrip.LastSeen, oldTrip.HeadSign)
+	if matchTrips(oldTrip, newTrip) {
 		return oldTrip, true
-	} else {
-		return newTrip, false
 	}
+	return newTrip, false
 }
 
 func logPosition(db *gorm.DB, bpr CleverPositionReport, reportTime time.Time) {
 	var err error
-	trip, tripFound := findExistingTrip(db, bpr, reportTime)
+	emptyCache := make(TripCache)
+	trip, tripFound := findExistingTrip(db, emptyCache, bpr, reportTime)
 	if !tripFound {
 		fmt.Printf("We are seeing this trip for the first time.")
 		db.NewRecord(trip)
