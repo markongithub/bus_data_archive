@@ -10,4 +10,11 @@ TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S)
 OUTFILE=$OUTDIR/buses$TIMESTAMP.json
 wget --no-check-certificate -O $OUTFILE "https://api.wmata.com/Bus.svc/json/jBusPositions?api_key=${API_KEY}"
 
+OUTFILE_GTFSRT_VP=$OUTDIR/gtfsrt-vp-$TIMESTAMP.pb
+wget --no-check-certificate -O $OUTFILE_GTFSRT_VP "https://api.wmata.com/gtfs/bus-gtfsrt-vehiclepositions.pb?api_key=${API_KEY}"
+
+OUTFILE_GTFSRT_TU=$OUTDIR/gtfsrt-tu-$TIMESTAMP.pb
+wget --no-check-certificate -O $OUTFILE_GTFSRT_TU "https://api.wmata.com/gtfs/bus-gtfsrt-tripupdates.pb?api_key=${API_KEY}"
+
+
 touch $LOGFILE

@@ -37,37 +37,6 @@ POLICY
   }
 }
 
-resource "aws_db_instance" "busdata00" {
-  storage_type            = "gp2"
-  engine                  = "postgres"
-  engine_version          = "10.6"
-  instance_class          = "db.t2.micro"
-  license_model           = "postgresql-license"
-  allocated_storage       = "20"
-  availability_zone       = "us-west-2b"
-  backup_retention_period = "7"
-  backup_window           = "11:23-11:53"
-  copy_tags_to_snapshot   = "true"
-  db_subnet_group_name    = "default"
-  deletion_protection     = "true"
-  maintenance_window      = "tue:08:26-tue:08:56"
-  monitoring_interval     = "60"
-  monitoring_role_arn     = "arn:aws:iam::935801117323:role/rds-monitoring-role"
-  multi_az                = "false"
-  name                    = "busdata00"
-  option_group_name       = "default:postgres-10"
-  parameter_group_name    = "default.postgres10"
-  port                    = "5432"
-  publicly_accessible     = "true"
-  skip_final_snapshot     = "true"
-
-  tags = {
-    workload-type = "other"
-  }
-
-  username = "busdata_user"
-}
-
 resource "aws_glacier_vault" "bus-data-vault-00" {
   name = "bus-data-vault-00"
 }
@@ -81,4 +50,100 @@ resource "aws_glacier_vault" "bus-data-vault-00-eu-west-1" {
   provider = "aws.eu-west-1"
 
   name = "bus-data-vault-00-eu-west-1"
+}
+
+resource "aws_s3_bucket" "private" {
+  bucket = "busdata-01-us-west-2"
+
+  versioning {
+    enabled = true
+  }
+
+  replication_configuration {
+    role = "${aws_iam_role.replication.arn}"
+
+    rules {
+      id     = "my_only_replication"
+      status = "Enabled"
+
+      destination {
+        bucket        = "${aws_s3_bucket.private_replica.arn}"
+        storage_class = "STANDARD"
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket" "private_replica" {
+  provider = "aws.eu-west-1"
+  bucket   = "busdata-01-eu-west-1"
+
+  versioning {
+    enabled = true
+  }
+}
+
+resource "aws_iam_role" "replication" {
+  name = "busdata-replication"
+
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "s3.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_policy" "replication" {
+  name = "busdata-replication"
+
+  policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "s3:GetReplicationConfiguration",
+        "s3:ListBucket"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_s3_bucket.private.arn}"
+      ]
+    },
+    {
+      "Action": [
+        "s3:GetObjectVersion",
+        "s3:GetObjectVersionAcl"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_s3_bucket.private.arn}/*"
+      ]
+    },
+    {
+      "Action": [
+        "s3:ReplicateObject",
+        "s3:ReplicateDelete"
+      ],
+      "Effect": "Allow",
+      "Resource": "${aws_s3_bucket.private_replica.arn}/*"
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_role_policy_attachment" "replication" {
+  role       = "${aws_iam_role.replication.name}"
+  policy_arn = "${aws_iam_policy.replication.arn}"
 }

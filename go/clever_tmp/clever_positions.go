@@ -1,13 +1,14 @@
 package main
 
 import (
+	"encoding/gob"
 	"encoding/xml"
 	"flag"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"io/ioutil"
-	// "os"
+	"os"
 	"regexp"
 	// "strings"
 	"time"
@@ -75,7 +76,7 @@ func fileTime(filePath string) time.Time {
 	r, _ := regexp.Compile("/buses(....-..-..T..:..:..)\\.xml")
 	result := r.FindStringSubmatch(filePath)
 	if result == nil {
-		panic("could not parse time from filename")
+		panic("could not parse time from inputFile")
 	}
 	t1, err := time.Parse(
 		"2006-01-02T15:04:05", result[1])
@@ -95,7 +96,7 @@ func matchTrips(t1 TripInstance, t2 TripInstance) bool {
 		// a lot. We could see if we expected the trip to still be going.
 		// also this only works if you are adding reports in chronological order.
 		(t2.LastSeen.Sub(t1.LastSeen).Minutes() < 30) {
-		fmt.Printf("Matched with old trip last seen at %s with head sign %s", t1.LastSeen, t1.HeadSign)
+		fmt.Printf("Matched with old trip %d last seen at %s", t1.ID, t1.LastSeen)
 		return true
 	}
 	return false
@@ -130,6 +131,7 @@ func logPosition(db *gorm.DB, cache TripCache, bpr CleverPositionReport, reportT
 		trip.LastSeen = reportTime
 		err = db.Save(&trip).Error
 	}
+	cache[trip.Vehicle] = trip
 	check(err)
 	bp := BusPosition{
 		RetrievedAt:    reportTime,
@@ -165,9 +167,9 @@ func tripFromReport(bpr CleverPositionReport, reportTime time.Time) TripInstance
 
 }
 
-func parseFile(filename string) CleverPositionList {
-	fmt.Printf("I will attempt to parse %s\n", filename)
-	b, err := ioutil.ReadFile(filename)
+func parseFile(inputFile string) CleverPositionList {
+	fmt.Printf("I will attempt to parse %s\n", inputFile)
+	b, err := ioutil.ReadFile(inputFile)
 	check(err)
 
 	var m CleverPositionList
@@ -177,12 +179,39 @@ func parseFile(filename string) CleverPositionList {
 	return m
 }
 
+func loadCache(filename string) TripCache {
+	fmt.Printf("I will attempt to parse %s\n", filename)
+	f, err := os.Open(filename)
+	defer f.Close()
+	if err != nil {
+		return make(TripCache)
+	}
+	var cache TripCache
+	d := gob.NewDecoder(f)
+
+	// Decoding the serialized data
+	err = d.Decode(&cache)
+	check(err)
+	return cache
+}
+
+func writeCache(filename string, cache TripCache) {
+	f, err := os.Create(filename)
+	check(err)
+	defer f.Close()
+
+	e := gob.NewEncoder(f)
+	err = e.Encode(cache)
+	check(err)
+}
+
 func main() {
-	filename := flag.String("input_file", "", "XML file with bus data")
+	inputFile := flag.String("input_file", "", "XML file with bus data")
+	cacheFile := flag.String("cache_file", "", "serialized vehicle cache")
 	flag.Parse()
 
-	m := parseFile(*filename)
-	reportTime := fileTime(*filename)
+	m := parseFile(*inputFile)
+	reportTime := fileTime(*inputFile)
 
 	// db, err := gorm.Open("postgres", os.Getenv("DB_CONFIG"))
 	db, err := gorm.Open("sqlite3", "/tmp/gorm.db")
@@ -193,14 +222,19 @@ func main() {
 
 	db.AutoMigrate(&TripInstance{}, &BusPosition{})
 
-	emptyCache := make(TripCache)
+	cache := loadCache(*cacheFile)
 
+	fmt.Printf("The cache now has %d entries.\n", len(cache))
 	for _, bp := range m.BusPositions {
 		fmt.Printf("bus %s has head sign %s\n", bp.Vehicle, bp.HeadSign)
 		if (bp.HeadSign == "Not in Service") || bp.HeadSign == "N/A" {
 			fmt.Printf("We will skip that one.\n")
 		} else {
-			logPosition(db, emptyCache, bp, reportTime)
+			logPosition(db, cache, bp, reportTime)
 		}
+	}
+	fmt.Printf("The cache now has %d entries.\n", len(cache))
+	if *cacheFile != "" {
+		writeCache(*cacheFile, cache)
 	}
 }
