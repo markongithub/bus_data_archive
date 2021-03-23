@@ -1,8 +1,7 @@
-package main
+package bus_positions
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
@@ -169,44 +168,4 @@ func parseFile(filename string) BusPositionList {
 	check(err)
 	fmt.Printf("The file contains %d bus positions.\n", len(m.BusPositions))
 	return m
-}
-
-func main() {
-	filename := flag.String("input_file", "", "JSON file with bus data")
-	onlyBadTripData := flag.Bool("bad_overnight_data_only", false, "ONLY process data with the overnight corruption bug")
-	flag.Parse()
-
-	m := parseFile(*filename)
-	reportTime := fileTime(*filename)
-
-	location, err := time.LoadLocation("US/Eastern")
-	check(err)
-
-	// TODO: This file name should be a flag.
-	dbConfig, err := ioutil.ReadFile("./database_config.txt")
-	check(err)
-
-	db, err := gorm.Open("postgres", string(dbConfig[:]))
-	if err != nil {
-		panic("failed to connect database")
-	}
-	defer db.Close()
-
-	db.LogMode(true)
-
-	db.AutoMigrate(&TripInstance{}, &BusPosition{})
-
-	for _, bp := range m.BusPositions {
-		fixed, isBad := fixBadTripData(bp, location)
-		if isBad {
-			logPosition(db, fixed, reportTime)
-		} else {
-			if !(*onlyBadTripData) {
-				logPosition(db, bp, reportTime)
-			} else {
-				fmt.Println("Skipping since we are only backfilling bad trip data.")
-			}
-
-		}
-	}
 }
