@@ -1,1 +1,0 @@
-host=bus-example.example.us-west-2.rds.amazonaws.com port=5432 user=example_user dbname=busdatabase password=iL0v3bu$e$
