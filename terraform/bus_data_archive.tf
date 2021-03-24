@@ -30,6 +30,7 @@ resource "aws_s3_bucket" "first_bucket" {
 }
 POLICY
 
+
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET"]
@@ -47,7 +48,7 @@ provider "aws" {
 }
 
 resource "aws_glacier_vault" "bus-data-vault-00-eu-west-1" {
-  provider = "aws.eu-west-1"
+  provider = aws.eu-west-1
 
   name = "bus-data-vault-00-eu-west-1"
 }
@@ -60,14 +61,14 @@ resource "aws_s3_bucket" "private" {
   }
 
   replication_configuration {
-    role = "${aws_iam_role.replication.arn}"
+    role = aws_iam_role.replication.arn
 
     rules {
       id     = "my_only_replication"
       status = "Enabled"
 
       destination {
-        bucket        = "${aws_s3_bucket.private_replica.arn}"
+        bucket        = aws_s3_bucket.private_replica.arn
         storage_class = "STANDARD"
       }
     }
@@ -75,7 +76,7 @@ resource "aws_s3_bucket" "private" {
 }
 
 resource "aws_s3_bucket" "private_replica" {
-  provider = "aws.eu-west-1"
+  provider = aws.eu-west-1
   bucket   = "busdata-01-eu-west-1"
 
   versioning {
@@ -101,6 +102,7 @@ resource "aws_iam_role" "replication" {
   ]
 }
 POLICY
+
 }
 
 resource "aws_iam_policy" "replication" {
@@ -141,18 +143,19 @@ resource "aws_iam_policy" "replication" {
   ]
 }
 POLICY
+
 }
 
 resource "aws_iam_role_policy_attachment" "replication" {
-  role       = "${aws_iam_role.replication.name}"
-  policy_arn = "${aws_iam_policy.replication.arn}"
+  role       = aws_iam_role.replication.name
+  policy_arn = aws_iam_policy.replication.arn
 }
 
 resource "aws_dynamodb_table" "wmata_bus" {
-  name           = "wmata_bus"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "RetrievedAtDate"
-  range_key      = "RetrievedAt"
+  name         = "wmata_bus"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "RetrievedAtDate"
+  range_key    = "RetrievedAt"
 
   attribute {
     name = "RetrievedAtDate"
