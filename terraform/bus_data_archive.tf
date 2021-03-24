@@ -147,3 +147,25 @@ resource "aws_iam_role_policy_attachment" "replication" {
   role       = "${aws_iam_role.replication.name}"
   policy_arn = "${aws_iam_policy.replication.arn}"
 }
+
+resource "aws_dynamodb_table" "wmata_bus" {
+  name           = "wmata_bus"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "RetrievedAtDate"
+  range_key      = "RetrievedAt"
+
+  attribute {
+    name = "RetrievedAtDate"
+    type = "S"
+  }
+
+  attribute {
+    name = "RetrievedAt"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = ""
+    enabled        = false
+  }
+}
