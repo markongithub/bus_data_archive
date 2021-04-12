@@ -64,7 +64,7 @@ func check(e error) {
 	}
 }
 
-func fileTime(filePath string) time.Time {
+func FileTime(filePath string) time.Time {
 	// 6/buses2019-03-26T23:28:01.json
 	r, _ := regexp.Compile("/buses(....-..-..T..:..:..)\\.json")
 	result := r.FindStringSubmatch(filePath)
@@ -158,7 +158,7 @@ func fixBadTripData(bpr BusPositionReport, location *time.Location) (BusPosition
 	return BusPositionReport{}, false
 }
 
-func parseFile(filename string) BusPositionList {
+func ParseFile(filename string) BusPositionList {
 	fmt.Printf("I will attempt to parse %s", filename)
 	b, err := ioutil.ReadFile(filename)
 	check(err)
