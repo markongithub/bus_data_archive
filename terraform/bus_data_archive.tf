@@ -154,16 +154,16 @@ resource "aws_iam_role_policy_attachment" "replication" {
 resource "aws_dynamodb_table" "wmata_bus" {
   name         = "wmata_bus"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "RetrievedAtDate"
-  range_key    = "RetrievedAt"
+  hash_key     = "PartitionKey"
+  range_key    = "RangeKey"
 
   attribute {
-    name = "RetrievedAtDate"
+    name = "PartitionKey"
     type = "S"
   }
 
   attribute {
-    name = "RetrievedAt"
+    name = "RangeKey"
     type = "S"
   }
 
