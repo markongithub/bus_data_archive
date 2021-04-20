@@ -76,9 +76,8 @@ func ConvertToFlatRecord(b BusPositionReport, retrievedAt time.Time) BusPosition
 }
 
 func logPosition(db *gorm.DB, bpr BusPositionReport, reportTime time.Time) {
-	var err error
 	record := ConvertToFlatRecord(bpr, reportTime)
-	result := db.Create(&record)
+	db.Create(&record)
 }
 
 func main() {
@@ -92,9 +91,8 @@ func main() {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	defer db.Close()
 
-	db.LogMode(true)
+	// db.LogMode(true)
 
 	db.AutoMigrate(&BusPositionReportSQLDenorm{})
 
